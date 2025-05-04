@@ -1,0 +1,88 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  frontend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint check
+        run: npm run lint
+      
+      - name: Run tests
+        run: npm test
+
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      
+      - name: Run tests
+        run: |
+          pytest --cov=app tests/
+
+  build-and-deploy:
+    needs: [frontend-test, backend-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      # Add steps to build Docker images and deploy
+      # Example steps are provided below (would need to be configured for specific deployment targets)
+      
+      - name: Build frontend Docker image
+        run: |
+          docker build -t order-management-frontend:latest ./frontend
+      
+      - name: Build backend Docker image
+        run: |
+          docker build -t order-management-backend:latest ./backend
+      
+      # Deploy steps would go here
+      # - name: Deploy to production
+      #   run: |
+      #     # Example deployment script
+      #     echo "Deploying to production..."
+      
+      - name: Notify deployment success
+        run: |
+          echo "Deployment completed successfully!" 

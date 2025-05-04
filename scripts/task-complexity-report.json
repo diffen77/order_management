@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "generatedAt": "2025-05-04T10:56:56.131Z",
+    "tasksAnalyzed": 20,
+    "thresholdScore": 5,
+    "projectName": "Taskmaster",
+    "usedResearch": false
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Setup Project Structure and Repository",
+      "complexityScore": 4,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Setup Project Structure and Repository' task into 3 subtasks: one for backend setup, one for frontend setup, and one for configuration and documentation.",
+      "reasoning": "This is a foundational task with clear steps and well-defined outcomes. The complexity is moderate as it involves setting up both frontend and backend environments, but follows standard patterns with minimal business logic."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Implement Authentication System",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Authentication System' task into 4 subtasks: backend authentication infrastructure, user management API, frontend authentication services, and role-based access control implementation.",
+      "reasoning": "Authentication is complex due to security requirements, role-based access control, and the need for both frontend and backend components. It requires careful implementation of JWT, secure password handling, and session management."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Design and Implement Database Schema",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Design and Implement Database Schema' task into 3 subtasks: schema design and relationships, Supabase configuration and security, and migration/backup strategy implementation.",
+      "reasoning": "Database design requires careful consideration of relationships between multiple entities. The complexity comes from ensuring proper normalization, indexing, and security rules in Supabase, plus setting up migration paths."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Develop Core API Endpoints",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the 'Develop Core API Endpoints' task into 5 subtasks: user/authentication endpoints, product/inventory endpoints, customer endpoints, order/payment endpoints, and API infrastructure (validation, error handling, documentation).",
+      "reasoning": "This task has high complexity due to the large number of endpoints across multiple entity types, each requiring validation, error handling, and security considerations. It also requires implementing advanced features like pagination, filtering, and rate limiting."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Implement Order Management Frontend",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Order Management Frontend' task into 4 subtasks: order listing and search interface, order creation form, order detail view with status management, and order history/reporting views.",
+      "reasoning": "The frontend order management involves complex forms with dynamic product selection, inventory validation, and multiple views. It requires sophisticated state management and user interactions across several interconnected components."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Implement Order Processing Backend",
+      "complexityScore": 8,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Order Processing Backend' task into 4 subtasks: order creation and validation logic, order status management workflow, inventory integration, and order search/filtering capabilities.",
+      "reasoning": "Order processing contains complex business logic including inventory validation, status transitions, and transaction management. It requires careful implementation of business rules and integration with multiple subsystems."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Implement Inventory Management System",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Inventory Management System' task into 4 subtasks: inventory tracking core functionality, warehouse/location management, inventory alerts and reporting, and inventory adjustment workflows.",
+      "reasoning": "Inventory management involves complex tracking across multiple locations, automatic updates based on orders, and sophisticated alerting. It requires careful transaction management and history tracking."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Implement Customer Management System",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Implement Customer Management System' task into 3 subtasks: customer profile management, customer type and pricing rules, and customer reporting and segmentation.",
+      "reasoning": "Customer management includes profile data, type-specific pricing rules, and segmentation capabilities. The complexity comes from implementing customer-specific business rules and maintaining relationship data."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Implement Payment Processing Integration",
+      "complexityScore": 8,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Payment Processing Integration' task into 4 subtasks: payment gateway integration, payment status tracking and history, invoice/receipt generation, and refund processing.",
+      "reasoning": "Payment processing is highly complex due to integration with external payment gateways, security requirements for handling payment information, and the need to manage various payment states and methods."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Implement Reporting and Analytics System",
+      "complexityScore": 8,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Reporting and Analytics System' task into 4 subtasks: sales and inventory reports, financial reporting, data visualization components, and report export/scheduling functionality.",
+      "reasoning": "Reporting systems require complex data aggregation, visualization components, and export capabilities. The system must process large datasets efficiently and present meaningful insights across multiple business dimensions."
+    },
+    {
+      "taskId": 11,
+      "taskTitle": "Implement User Management and Access Control",
+      "complexityScore": 7,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Implement User Management and Access Control' task into 3 subtasks: user administration interface, role and permission management, and user activity auditing.",
+      "reasoning": "User management involves complex permission systems, security considerations, and audit requirements. It requires careful implementation of role hierarchies and granular permission controls."
+    },
+    {
+      "taskId": 12,
+      "taskTitle": "Implement Shipping Integration",
+      "complexityScore": 7,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Implement Shipping Integration' task into 3 subtasks: shipping provider API integration, shipping cost calculation and label generation, and shipment tracking functionality.",
+      "reasoning": "Shipping integration involves multiple external APIs with different formats and requirements. It requires handling complex shipping rules, international shipping considerations, and tracking capabilities."
+    },
+    {
+      "taskId": 13,
+      "taskTitle": "Implement Email Notification System",
+      "complexityScore": 5,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Implement Email Notification System' task into 3 subtasks: email service integration, email template management, and notification trigger implementation.",
+      "reasoning": "Email notification system requires integration with external services, template management, and event-based triggers. The complexity is moderate as the patterns are well-established."
+    },
+    {
+      "taskId": 14,
+      "taskTitle": "Implement Multi-Warehouse Support",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Implement Multi-Warehouse Support' task into 3 subtasks: warehouse management interface, warehouse-specific inventory tracking, and inter-warehouse transfer functionality.",
+      "reasoning": "Multi-warehouse support extends the inventory system with location-specific tracking and transfers. The complexity comes from managing inventory across locations while maintaining data consistency."
+    },
+    {
+      "taskId": 15,
+      "taskTitle": "Implement Batch Operations",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Implement Batch Operations' task into 3 subtasks: batch processing infrastructure, batch operation UI, and batch operation logging and error handling.",
+      "reasoning": "Batch operations require robust processing infrastructure, error handling, and status tracking. The complexity comes from handling large volumes of data while maintaining system performance and data integrity."
+    },
+    {
+      "taskId": 16,
+      "taskTitle": "Implement Advanced Analytics and Forecasting",
+      "complexityScore": 9,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Advanced Analytics and Forecasting' task into 4 subtasks: sales forecasting algorithms, inventory optimization, customer behavior analysis, and advanced visualization components.",
+      "reasoning": "Advanced analytics involves complex algorithms for forecasting, optimization, and pattern recognition. It requires statistical knowledge, data processing expertise, and sophisticated visualization capabilities."
+    },
+    {
+      "taskId": 17,
+      "taskTitle": "Implement Customer Portal",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement Customer Portal' task into 4 subtasks: customer authentication and profile management, order management functionality, product catalog and wishlist, and customer support features.",
+      "reasoning": "The customer portal is essentially a separate application with its own authentication, order management, and product browsing capabilities. It requires careful UX design and integration with the main system."
+    },
+    {
+      "taskId": 18,
+      "taskTitle": "Implement Mobile Responsiveness",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the 'Implement Mobile Responsiveness' task into 3 subtasks: responsive layout implementation, mobile-specific UI components, and mobile performance optimization.",
+      "reasoning": "Mobile responsiveness requires adapting the entire UI for different screen sizes and touch interactions. The complexity comes from ensuring good UX across devices while maintaining functionality."
+    },
+    {
+      "taskId": 19,
+      "taskTitle": "Implement API Documentation",
+      "complexityScore": 5,
+      "recommendedSubtasks": 2,
+      "expansionPrompt": "Break down the 'Implement API Documentation' task into 2 subtasks: Swagger/OpenAPI implementation and documentation content creation with examples.",
+      "reasoning": "API documentation is straightforward with tools like Swagger, though it requires comprehensive coverage of all endpoints with examples and clear explanations."
+    },
+    {
+      "taskId": 20,
+      "taskTitle": "Implement System Performance Optimization",
+      "complexityScore": 8,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the 'Implement System Performance Optimization' task into 4 subtasks: database optimization, API and caching optimization, frontend performance improvements, and infrastructure scaling configuration.",
+      "reasoning": "Performance optimization requires deep technical knowledge across the full stack. It involves database tuning, caching strategies, code optimization, and infrastructure configuration for scalability."
+    }
+  ]
+}
