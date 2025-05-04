@@ -1,14 +1,33 @@
-import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, FormEvent, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+
+interface LocationState {
+  from?: {
+    pathname: string;
+  };
+  message?: string;
+}
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn } = useAuth();
+
+  useEffect(() => {
+    // Check for success messages passed via location state
+    const state = location.state as LocationState;
+    if (state?.message) {
+      setSuccessMessage(state.message);
+      // Clear the location state
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -20,6 +39,7 @@ const Login = () => {
     
     try {
       setError(null);
+      setSuccessMessage(null);
       setLoading(true);
       
       const { error } = await signIn(email, password);
@@ -29,7 +49,10 @@ const Login = () => {
         return;
       }
       
-      navigate('/');
+      // Redirect to the page the user was trying to access, or to home
+      const state = location.state as LocationState;
+      const redirectTo = state?.from?.pathname || '/';
+      navigate(redirectTo);
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
       console.error(err);
@@ -45,6 +68,12 @@ const Login = () => {
       {error && (
         <div className="w-full p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">
           {error}
+        </div>
+      )}
+      
+      {successMessage && (
+        <div className="w-full p-3 mb-4 text-sm text-green-700 bg-green-100 rounded-lg" role="alert">
+          {successMessage}
         </div>
       )}
       
@@ -77,6 +106,11 @@ const Login = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             required
           />
+          <div className="mt-1 text-right">
+            <Link to="/auth/reset-password" className="text-sm text-blue-600 hover:text-blue-500">
+              Forgot password?
+            </Link>
+          </div>
         </div>
         
         <button
