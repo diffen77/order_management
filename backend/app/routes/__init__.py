@@ -4,20 +4,28 @@ This module centralizes all route imports and provides a structured way
 to include them in the main FastAPI application.
 """
 from fastapi import APIRouter
-from app.routes import users, auth, api_info, orders, products
+from .users import router as users_router
+from .auth import router as auth_router
+from .products import router as products_router
+from .customers import router as customers_router
+from .orders import router as orders_router
+from .email import router as email_router
+from .api_info import router as info_router
+from .fulfillment import router as fulfillment_router
 from app.utils.config import settings
 
 # Create API version router
 api_router_v1 = APIRouter()
 
 # Include all resource routers with appropriate prefixes and tags
-api_router_v1.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-api_router_v1.include_router(users.router, prefix="/users", tags=["Users"])
-api_router_v1.include_router(api_info.router, prefix="/info", tags=["API Information"])
-
-# Comment out these until they are fully implemented
-# api_router_v1.include_router(orders.router, prefix="/orders", tags=["Orders"])
-# api_router_v1.include_router(products.router, prefix="/products", tags=["Products"])
+api_router_v1.include_router(auth_router, prefix="/auth", tags=["auth"])
+api_router_v1.include_router(users_router, prefix="/users", tags=["users"])
+api_router_v1.include_router(products_router, prefix="/products", tags=["products"])
+api_router_v1.include_router(customers_router, prefix="/customers", tags=["customers"])
+api_router_v1.include_router(orders_router, prefix="/orders", tags=["orders"])
+api_router_v1.include_router(email_router, prefix="/email", tags=["email"])
+api_router_v1.include_router(fulfillment_router, prefix="/fulfillment", tags=["fulfillment"])
+api_router_v1.include_router(info_router, tags=["info"])
 
 # Function to setup all routes for the main application
 def setup_routes(app):

@@ -25,6 +25,7 @@ const Sidebar: React.FC = () => {
   const navigationItems: NavItem[] = [
     { path: '/', label: 'Dashboard' },
     { path: '/orders', label: 'Orders', permission: 'read:orders' },
+    { path: '/customers', label: 'Customers', permission: 'read:customers' },
     { path: '/products', label: 'Products', permission: 'read:products' },
     { path: '/forms', label: 'Forms', permission: 'manage:forms' },
     { path: '/statistics', label: 'Statistics', permission: 'read:statistics' }
