@@ -34,6 +34,8 @@ const OrderHistoryPage = lazy(() => import('./pages/orders/OrderHistoryPage'));
 // Customer pages
 const CustomersList = lazy(() => import('./pages/customers/CustomersList'));
 const CustomerDetail = lazy(() => import('./pages/customers/CustomerDetail'));
+const CustomerForm = lazy(() => import('./pages/customers/CustomerForm'));
+const AddCustomerNote = lazy(() => import('./pages/customers/AddCustomerNote'));
 
 // Admin pages
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
@@ -74,7 +76,9 @@ function App() {
               <Route path="customers">
                 <Route index element={<CustomersList />} />
                 <Route path=":id" element={<CustomerDetail />} />
-                {/* Additional customer routes will be added later */}
+                <Route path="new" element={<CustomerForm />} />
+                <Route path=":id/edit" element={<CustomerForm />} />
+                <Route path=":id/notes/add" element={<AddCustomerNote />} />
               </Route>
               
               {/* Producer and Admin routes */}
