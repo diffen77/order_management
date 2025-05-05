@@ -51,4 +51,20 @@ export const deleteProduct = async (id: string): Promise<void> => {
 export const updateInventory = async (id: string, quantity: number): Promise<Product> => {
   const response = await put<Product>(`${API_ENDPOINTS.PRODUCTS}/${id}/inventory`, { quantity });
   return response.data;
+};
+
+/**
+ * Get inventory levels for all products
+ */
+export const getInventory = async (): Promise<any[]> => {
+  const response = await get<any[]>(`${API_ENDPOINTS.PRODUCTS}/inventory`);
+  return response.data;
+};
+
+/**
+ * Adjust inventory level for a specific product
+ */
+export const adjustInventory = async (productId: string, quantity: number): Promise<any> => {
+  const response = await post<any>(`${API_ENDPOINTS.PRODUCTS}/inventory/adjust`, { product_id: productId, quantity });
+  return response.data;
 }; 

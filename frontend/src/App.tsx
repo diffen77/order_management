@@ -10,6 +10,7 @@ import RoleBasedRoute from './components/RoleBasedRoute';
 
 // Context providers
 import { AuthProvider } from './context/AuthContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 
 // Lazy-loaded pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -26,6 +27,9 @@ const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 // Order pages
 const OrdersList = lazy(() => import('./pages/orders/OrdersList'));
 const OrderDetails = lazy(() => import('./pages/orders/OrderDetails'));
+const OrderForm = lazy(() => import('./pages/orders/OrderForm'));
+const OrderTimeline = lazy(() => import('./pages/orders/OrderTimeline'));
+const OrderHistoryPage = lazy(() => import('./pages/orders/OrderHistoryPage'));
 
 // Admin pages
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
@@ -34,68 +38,73 @@ const SystemSettings = lazy(() => import('./pages/admin/SystemSettings'));
 function App() {
   return (
     <AuthProvider>
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          {/* Auth routes */}
-          <Route path="/auth" element={<AuthLayout />}>
-            <Route path="login" element={<Login />} />
-            <Route path="register" element={<Register />} />
-            <Route path="reset-password" element={<ResetPassword />} />
-            <Route path="update-password" element={<UpdatePassword />} />
-          </Route>
-
-          {/* Unauthorized page */}
-          <Route path="/unauthorized" element={<Unauthorized />} />
-
-          {/* Protected routes for all authenticated users */}
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<Dashboard />} />
-            
-            {/* Order routes - accessible to all users */}
-            <Route path="orders">
-              <Route index element={<OrdersList />} />
-              <Route path=":id" element={<OrderDetails />} />
-              {/* We'll add more order routes later, like edit view */}
+      <NotificationsProvider>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            {/* Auth routes */}
+            <Route path="/auth" element={<AuthLayout />}>
+              <Route path="login" element={<Login />} />
+              <Route path="register" element={<Register />} />
+              <Route path="reset-password" element={<ResetPassword />} />
+              <Route path="update-password" element={<UpdatePassword />} />
             </Route>
-            
-            {/* Producer and Admin routes */}
-            <Route path="products" element={
-              <RoleBasedRoute allowedRoles={['producer', 'admin']}>
-                <ProductManagement />
-              </RoleBasedRoute>
-            } />
-            
-            <Route path="forms" element={
-              <RoleBasedRoute allowedRoles={['producer', 'admin']}>
-                <FormBuilder />
-              </RoleBasedRoute>
-            } />
-            
-            <Route path="statistics" element={
-              <RoleBasedRoute allowedRoles={['producer', 'admin']}>
-                <Statistics />
-              </RoleBasedRoute>
-            } />
-            
-            {/* Admin-only routes */}
-            <Route path="admin">
-              <Route path="users" element={
-                <RoleBasedRoute allowedRoles={['admin']}>
-                  <UserManagement />
+
+            {/* Unauthorized page */}
+            <Route path="/unauthorized" element={<Unauthorized />} />
+
+            {/* Protected routes for all authenticated users */}
+            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route index element={<Dashboard />} />
+              
+              {/* Order routes - accessible to all users */}
+              <Route path="orders">
+                <Route index element={<OrdersList />} />
+                <Route path=":id" element={<OrderDetails />} />
+                <Route path="new" element={<OrderForm />} />
+                <Route path=":id/edit" element={<OrderForm />} />
+                <Route path=":id/timeline" element={<OrderTimeline />} />
+                <Route path=":id/history" element={<OrderHistoryPage />} />
+              </Route>
+              
+              {/* Producer and Admin routes */}
+              <Route path="products" element={
+                <RoleBasedRoute allowedRoles={['producer', 'admin']}>
+                  <ProductManagement />
                 </RoleBasedRoute>
               } />
-              <Route path="settings" element={
-                <RoleBasedRoute allowedRoles={['admin']}>
-                  <SystemSettings />
+              
+              <Route path="forms" element={
+                <RoleBasedRoute allowedRoles={['producer', 'admin']}>
+                  <FormBuilder />
                 </RoleBasedRoute>
               } />
+              
+              <Route path="statistics" element={
+                <RoleBasedRoute allowedRoles={['producer', 'admin']}>
+                  <Statistics />
+                </RoleBasedRoute>
+              } />
+              
+              {/* Admin-only routes */}
+              <Route path="admin">
+                <Route path="users" element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <UserManagement />
+                  </RoleBasedRoute>
+                } />
+                <Route path="settings" element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <SystemSettings />
+                  </RoleBasedRoute>
+                } />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Not found route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
+            {/* Not found route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }

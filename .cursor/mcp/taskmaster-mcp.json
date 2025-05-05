@@ -1,0 +1,33 @@
+{
+  "name": "taskmaster-mcp",
+  "description": "Taskmaster MCP Tools",
+  "version": "1.0.0",
+  "main": "taskmaster-mcp.js",
+  "env": {
+    "ANTHROPIC_API_KEY": "${process.env.ANTHROPIC_API_KEY}",
+    "PERPLEXITY_API_KEY": "${process.env.PERPLEXITY_API_KEY}",
+    "OPENAI_API_KEY": "${process.env.OPENAI_API_KEY}"
+  },
+  "tools": [
+    "get_tasks",
+    "get_task",
+    "next_task",
+    "add_task",
+    "add_subtask",
+    "update_subtask",
+    "update_task",
+    "update",
+    "set_task_status",
+    "expand_task",
+    "expand_all",
+    "clear_subtasks",
+    "remove_subtask",
+    "add_dependency",
+    "remove_dependency",
+    "validate_dependencies",
+    "fix_dependencies",
+    "analyze_project_complexity",
+    "complexity_report",
+    "generate"
+  ]
+} 

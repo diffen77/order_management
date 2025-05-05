@@ -1,0 +1,17 @@
+{
+  "mcps": [
+    {
+      "path": "./mcp/supabase-mcp-server.json",
+      "enabled": true
+    },
+    {
+      "path": "./mcp/taskmaster-mcp.json",
+      "enabled": true
+    }
+  ],
+  "env": {
+    "ANTHROPIC_API_KEY": "${process.env.ANTHROPIC_API_KEY}",
+    "PERPLEXITY_API_KEY": "${process.env.PERPLEXITY_API_KEY}",
+    "OPENAI_API_KEY": "${process.env.OPENAI_API_KEY}"
+  }
+} 

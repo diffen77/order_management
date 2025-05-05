@@ -2,7 +2,6 @@
   "name": "supabase-order-management",
   "description": "MCP server for Supabase cloud database operations",
   "version": "1.0.0",
-  "executable": ".cursor/mcp/supabase-mcp-server.bat",
-  "invocation": "supabase-mcp-server",
+  "url": "http://localhost:3500",
   "documentationUrl": "https://supabase.com/docs"
-} 
+}

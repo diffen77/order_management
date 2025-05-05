@@ -1,27 +1,16 @@
 import React from 'react';
-import { Chip } from '@mui/material';
+import { Chip, ChipProps } from '@mui/material';
 import { OrderStatus } from '../types/models';
 
-// Status chip color mapping
-const statusColors: Record<OrderStatus, 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'> = {
-  'new': 'info',
-  'pending': 'secondary', 
-  'processing': 'primary',
-  'shipped': 'warning',
-  'delivered': 'success',
-  'cancelled': 'error',
-  'returned': 'error'
-};
-
-// Status text mapping for better display names
-const statusText: Record<OrderStatus, string> = {
-  'new': 'New',
-  'pending': 'Pending',
-  'processing': 'Processing',
-  'shipped': 'Shipped',
-  'delivered': 'Delivered',
-  'cancelled': 'Cancelled',
-  'returned': 'Returned'
+// Map order status to color and label
+const STATUS_MAP: Record<OrderStatus, { color: ChipProps['color']; label: string }> = {
+  'new': { color: 'default', label: 'New' },
+  'pending': { color: 'info', label: 'Pending' },
+  'processing': { color: 'primary', label: 'Processing' },
+  'shipped': { color: 'primary', label: 'Shipped' },
+  'delivered': { color: 'success', label: 'Delivered' },
+  'cancelled': { color: 'error', label: 'Cancelled' },
+  'returned': { color: 'warning', label: 'Returned' }
 };
 
 interface OrderStatusBadgeProps {
@@ -38,9 +27,7 @@ const OrderStatusBadge: React.FC<OrderStatusBadgeProps> = ({
   size = 'small',
   className
 }) => {
-  // Handle unknown statuses gracefully
-  const color = statusColors[status] || 'default';
-  const label = statusText[status] || status.charAt(0).toUpperCase() + status.slice(1);
+  const { color, label } = STATUS_MAP[status] || { color: 'default', label: status };
   
   return (
     <Chip 

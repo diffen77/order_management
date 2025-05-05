@@ -13,6 +13,10 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\""
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.0.2",
+    "@mui/material": "^7.0.2",
     "@supabase/auth-helpers-react": "^0.4.2",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.2",
@@ -48,4 +52,4 @@
     "vite": "^5.0.0",
     "vitest": "^0.34.6"
   }
-} 
+}
