@@ -9,6 +9,14 @@ from decimal import Decimal
 
 from app.services.supabase import get_supabase_client
 from app.schemas.fulfillment import PickList, PickListItem, FulfillmentStatus, PackingSlip, PackingSlipItem
+from app.services.validation_service import (
+    validate_fulfillment_prerequisites,
+    validate_status_transition
+)
+from app.services.notification_service import (
+    NotificationType,
+    NotificationService
+)
 
 
 async def generate_producer_pick_list(producer_id: UUID) -> PickList:
@@ -184,6 +192,19 @@ async def generate_producer_pick_list(producer_id: UUID) -> PickList:
         status=FulfillmentStatus.PENDING
     )
     
+    # 10. Send notification about the pick list if there are items to fulfill
+    if len(pick_list_items) > 0:
+        try:
+            # Use the pick list ID as the reference for the notification
+            await NotificationService.notify_fulfillment_request(
+                None,  # No specific order ID since this is a consolidated pick list
+                producer_id,
+                pick_list.id
+            )
+        except Exception as e:
+            # Log error but don't fail the pick list generation if notification fails
+            print(f"Error sending producer pick list notification: {str(e)}")
+    
     return pick_list
 
 
@@ -290,19 +311,65 @@ async def generate_order_packing_slip(order_id: UUID) -> PackingSlip:
     packing_slip = PackingSlip(
         id=uuid4(),
         order_id=order_id,
+        order_number=order.get("order_number", str(order_id)),
         customer_name=customer_name,
         customer_email=customer_email,
         shipping_address=order.get("shipping_address"),
-        created_at=datetime.now(),
+        billing_address=order.get("billing_address"),
         items=packing_slip_items,
-        total_items=len(packing_slip_items),
         subtotal=subtotal,
         shipping_cost=shipping_cost,
-        total_amount=total_amount,
-        currency=order.get("currency", "SEK"),
-        notes=company_notes,
-        pickup_instructions=pickup_instructions
+        tax=Decimal(str(order.get("tax", "0"))),
+        total=total_amount,
+        payment_method=order.get("payment_method", "Unknown"),
+        shipping_method=order.get("shipping_method", "Unknown"),
+        created_at=datetime.now(),
+        company_info=company_notes,
+        return_policy=order.get("return_policy"),
+        notes=order.get("notes"),
+        additional_info=pickup_instructions
     )
+    
+    # Notify producers about the packing slip generation
+    try:
+        # Get producer ID from the order items
+        product_response = None
+        producer_id = None
+        
+        # Find first product in the order and get its producer
+        if order_items_response.data:
+            product_id = order_items_response.data[0].get("product_id")
+            if product_id:
+                product_response = supabase.table("products").select("producer_id").eq("id", product_id).execute()
+                if not product_response.error and product_response.data:
+                    producer_id = product_response.data[0].get("producer_id")
+        
+        # Send packing slip notification if we found a producer
+        if producer_id:
+            shipping_carrier = order.get("shipping_carrier", "Standard Shipping")
+            tracking_number = order.get("tracking_number", "N/A")
+            delivery_date = order.get("estimated_delivery_date")
+            
+            if order.get("shipping_method") == "pickup":
+                # Special notification for pickup orders
+                await NotificationService.notify_status_update(
+                    order_id,
+                    producer_id,
+                    "ready_for_pickup",
+                    "Order is ready for customer pickup. Please prepare the items."
+                )
+            else:
+                # Standard shipping notification
+                await NotificationService.notify_shipping_confirmation(
+                    order_id,
+                    producer_id,
+                    shipping_carrier,
+                    tracking_number,
+                    delivery_date
+                )
+    except Exception as e:
+        # Log error but don't fail the packing slip generation if notification fails
+        print(f"Error sending packing slip notification: {str(e)}")
     
     return packing_slip
 
@@ -315,19 +382,17 @@ async def get_orders_by_producer(
     limit: int = 100
 ) -> Dict[str, Any]:
     """
-    Group orders by producer or get orders for a specific producer.
-    This function allows for retrieving orders that contain products from specific producers,
-    which is essential for the order fulfillment process.
+    Get orders grouped by producer or for a specific producer.
     
     Args:
-        producer_id: Optional UUID of a specific producer to filter by
-        status: Optional order status to filter by (e.g., 'confirmed', 'processing')
-        fulfillment_status: Optional fulfillment status to filter by (e.g., 'pending', 'processing')
-        skip: Number of results to skip (for pagination)
-        limit: Maximum number of results to return (for pagination)
+        producer_id: Optional UUID of a specific producer
+        status: Optional filter for order status
+        fulfillment_status: Optional filter for fulfillment status
+        skip: Number of results to skip (pagination)
+        limit: Maximum number of results to return (pagination)
         
     Returns:
-        Dict containing producer information and their associated orders
+        Dict: Object containing producers and their orders
     """
     supabase = get_supabase_client()
     
@@ -536,12 +601,41 @@ async def get_orders_by_producer(
     if producer_id:
         # Single producer response
         producer_orders = orders_by_producer.get(str(producer_id), [])
-        return {
+        result = {
             "producer_id": producer_id,
             "producer_name": producer_details.get(str(producer_id), {}).get("name", "Unknown Producer"),
             "orders": producer_orders,
             "total_orders": len(producer_orders)
         }
+        
+        # Notify producer about any new orders they haven't been notified about yet
+        try:
+            # Look for confirmed orders that haven't had fulfillment started
+            new_orders = [order for order in producer_orders 
+                          if order.get("status") == "confirmed" and 
+                          order.get("fulfillment_status") in ["pending", None]]
+            
+            # Send new order notifications
+            for order in new_orders:
+                # Check if notification already sent by looking for a notification history entry
+                notification_check = supabase.table("notification_history")\
+                    .select("id")\
+                    .eq("entity_id", str(order.get("id")))\
+                    .eq("notification_type", "new_order")\
+                    .eq("recipient_id", str(producer_id))\
+                    .execute()
+                
+                # Only notify if no previous notification found
+                if not notification_check.error and not notification_check.data:
+                    await NotificationService.notify_new_order(
+                        UUID(order.get("id")),
+                        producer_id
+                    )
+        except Exception as e:
+            # Log error but don't fail the order retrieval if notification fails
+            print(f"Error sending new order notifications: {str(e)}")
+        
+        return result
     else:
         # All producers response
         formatted_producers = []
@@ -556,7 +650,12 @@ async def get_orders_by_producer(
         
         return {
             "producers": formatted_producers,
-            "total_producers": len(formatted_producers)
+            "total_producers": len(formatted_producers),
+            "pagination": {
+                "total": len(formatted_producers),
+                "skip": skip,
+                "limit": limit
+            }
         }
 
 
@@ -567,20 +666,20 @@ async def update_fulfillment_status(
     notes: Optional[str] = None
 ) -> Dict:
     """
-    Update the fulfillment status of an order with validation and history tracking.
+    Update the fulfillment status of an order.
     
     Args:
         order_id: UUID of the order
         new_status: New fulfillment status
-        user_id: UUID of the user performing the update
-        notes: Optional notes for the status change
+        user_id: UUID of the user making the change
+        notes: Optional notes about the status change
         
     Returns:
-        Dict: Updated order data
+        Dict: Updated order with new status
     """
     supabase = get_supabase_client()
     
-    # 1. Get the current order
+    # 1. Get current order status
     order_response = supabase.table("orders").select("*").eq("id", str(order_id)).execute()
     
     if order_response.error:
@@ -596,104 +695,86 @@ async def update_fulfillment_status(
         )
     
     order = order_response.data[0]
+    current_status = order.get("fulfillment_status", "pending")
     
-    # 2. Validate the status value
-    current_status = order.get("fulfillment_status", FulfillmentStatus.PENDING)
+    # 2. Validate status transition
+    is_valid, validation_errors = await validate_status_transition(order_id, current_status, new_status)
     
-    try:
-        # Ensure it's a valid status value
-        if new_status not in [
-            FulfillmentStatus.PENDING,
-            FulfillmentStatus.PROCESSING,
-            FulfillmentStatus.PICKED,
-            FulfillmentStatus.PACKED,
-            FulfillmentStatus.READY,
-            FulfillmentStatus.SHIPPED,
-            FulfillmentStatus.COMPLETED,
-            FulfillmentStatus.CANCELLED
-        ]:
-            raise ValueError(f"Invalid fulfillment status: {new_status}")
-    except ValueError as e:
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=f"Invalid status transition from '{current_status}' to '{new_status}': {validation_errors}"
         )
     
-    # 3. Define and validate status transitions
-    valid_transitions = {
-        FulfillmentStatus.PENDING: [FulfillmentStatus.PROCESSING, FulfillmentStatus.CANCELLED],
-        FulfillmentStatus.PROCESSING: [FulfillmentStatus.PICKED, FulfillmentStatus.CANCELLED],
-        FulfillmentStatus.PICKED: [FulfillmentStatus.PACKED, FulfillmentStatus.CANCELLED],
-        FulfillmentStatus.PACKED: [FulfillmentStatus.READY, FulfillmentStatus.CANCELLED],
-        FulfillmentStatus.READY: [FulfillmentStatus.SHIPPED, FulfillmentStatus.CANCELLED],
-        FulfillmentStatus.SHIPPED: [FulfillmentStatus.COMPLETED, FulfillmentStatus.CANCELLED],
-        FulfillmentStatus.COMPLETED: [],  # Terminal state
-        FulfillmentStatus.CANCELLED: []   # Terminal state
-    }
-    
-    if new_status not in valid_transitions.get(current_status, []):
-        valid_status_list = ", ".join(valid_transitions.get(current_status, []))
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot transition from '{current_status}' to '{new_status}'. Valid transitions: {valid_status_list}"
-        )
-    
-    # 4. Create history record
-    fulfillment_history = {
-        "id": str(uuid4()),
-        "order_id": str(order_id),
-        "previous_status": current_status,
-        "new_status": new_status,
-        "changed_by": str(user_id),
-        "notes": notes,
-        "created_at": datetime.now().isoformat()
-    }
-    
-    # Insert history record
-    history_response = supabase.table("fulfillment_history").insert(fulfillment_history).execute()
-    
-    if history_response.error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error recording status history: {history_response.error.message}"
-        )
-    
-    # 5. Update order fulfillment status
+    # 3. Update order status
     update_data = {
-        "fulfillment_status": new_status,
-        "updated_at": datetime.now().isoformat()
+        "fulfillment_status": new_status
     }
     
-    # If status is SHIPPED, update order status to SHIPPED as well
+    # For some status changes, we also update the main order status
     if new_status == FulfillmentStatus.SHIPPED:
         update_data["status"] = "shipped"
-    
-    # If status is COMPLETED, update order status to DELIVERED
-    if new_status == FulfillmentStatus.COMPLETED:
+    elif new_status == FulfillmentStatus.DELIVERED:
         update_data["status"] = "delivered"
+    elif new_status == FulfillmentStatus.CANCELLED:
+        update_data["status"] = "cancelled"
     
     update_response = supabase.table("orders").update(update_data).eq("id", str(order_id)).execute()
     
     if update_response.error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating order: {update_response.error.message}"
+            detail=f"Error updating order status: {update_response.error.message}"
         )
     
-    # 6. Get the updated order
-    updated_order = update_response.data[0] if update_response.data else None
-    
-    # 7. Return the updated order with appropriate message
-    result = {
-        "order_id": order_id,
-        "fulfillment_status": new_status,
+    # 4. Create history entry
+    history_entry = {
+        "order_id": str(order_id),
         "previous_status": current_status,
-        "order_status": updated_order.get("status") if updated_order else None,
-        "message": f"Fulfillment status updated from '{current_status}' to '{new_status}'",
-        "updated_at": datetime.now().isoformat()
+        "new_status": new_status,
+        "user_id": str(user_id),
+        "notes": notes or f"Status changed from {current_status} to {new_status}",
+        "created_at": datetime.now().isoformat()
     }
     
-    return result
+    history_response = supabase.table("fulfillment_history").insert(history_entry).execute()
+    
+    if history_response.error:
+        # Log error but continue (don't fail the status update just because history logging failed)
+        print(f"Error creating fulfillment history entry: {history_response.error.message}")
+    
+    updated_order = update_response.data[0] if update_response.data else {"id": str(order_id), "fulfillment_status": new_status}
+
+    # 5. Send notification to the producer
+    try:
+        # Get producer ID from the order items
+        product_response = None
+        order_items_response = supabase.table("order_items").select("*").eq("order_id", str(order_id)).execute()
+        if not order_items_response.error and order_items_response.data:
+            # Get first product's producer_id
+            product_id = order_items_response.data[0].get("product_id")
+            if product_id:
+                product_response = supabase.table("products").select("producer_id").eq("id", product_id).execute()
+        
+        producer_id = None
+        if product_response and product_response.data:
+            producer_id = product_response.data[0].get("producer_id")
+        
+        if producer_id:
+            status_message = notes or f"Order status updated to {new_status}"
+            
+            # Send appropriate notification based on status
+            if new_status == FulfillmentStatus.PROCESSING:
+                await NotificationService.notify_fulfillment_request(order_id, producer_id, None)
+            elif new_status in [FulfillmentStatus.SHIPPED, FulfillmentStatus.DELIVERING, FulfillmentStatus.DELIVERED, FulfillmentStatus.CANCELLED]:
+                await NotificationService.notify_status_update(order_id, producer_id, new_status, status_message)
+            elif new_status == FulfillmentStatus.COMPLETED:
+                await NotificationService.notify_order_completion(order_id, producer_id)
+    except Exception as e:
+        # Log error but don't fail the status update if notification fails
+        print(f"Error sending producer notification: {str(e)}")
+    
+    return updated_order
 
 
 async def get_fulfillment_history(order_id: UUID) -> List[Dict]:
