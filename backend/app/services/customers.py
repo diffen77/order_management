@@ -7,7 +7,8 @@ from fastapi import HTTPException
 
 from app.models.customer import (
     CustomerCreate, CustomerUpdate, CustomerWithDetails, Customer, 
-    CustomerNoteCreate, CustomerNote, CustomerPreferencesCreate, CustomerPreferences
+    CustomerNoteCreate, CustomerNote, CustomerPreferencesCreate, CustomerPreferences,
+    Producer, ProducerWithDetails, ProducerType
 )
 from app.models.order import Order
 from app.utils.logging import setup_logger
@@ -21,7 +22,9 @@ async def get_customers(
     skip: int = 0, 
     limit: int = 100, 
     search: Optional[str] = None, 
-    customer_type: Optional[str] = None
+    customer_type: Optional[str] = None,
+    producer_type: Optional[str] = None,
+    is_active: Optional[bool] = None
 ) -> List[Customer]:
     """
     Get a list of customers with optional filtering.
@@ -29,6 +32,7 @@ async def get_customers(
     query = """
     SELECT 
         id, email, full_name, phone, address, postal_code, city, customer_type, 
+        business_name, business_id, producer_type, website, description, is_active,
         created_at, updated_at
     FROM 
         customers 
@@ -39,7 +43,7 @@ async def get_customers(
     
     # Add search filter if provided
     if search:
-        query += " AND (full_name ILIKE $1 OR email ILIKE $1"
+        query += " AND (full_name ILIKE $1 OR email ILIKE $1 OR business_name ILIKE $1"
         
         # Check if search term could be a UUID
         is_uuid = False
@@ -64,6 +68,18 @@ async def get_customers(
         query += f" AND customer_type = ${param_index}"
         params.append(customer_type)
     
+    # Add producer type filter if provided
+    if producer_type:
+        param_index = len(params) + 1
+        query += f" AND producer_type = ${param_index}"
+        params.append(producer_type)
+    
+    # Add active status filter if provided
+    if is_active is not None:
+        param_index = len(params) + 1
+        query += f" AND is_active = ${param_index}"
+        params.append(is_active)
+    
     # Add pagination
     param_skip_index = len(params) + 1
     param_limit_index = len(params) + 2
@@ -74,6 +90,22 @@ async def get_customers(
     return [Customer.parse_obj(customer) for customer in customers_data]
 
 
+async def get_producers(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    producer_type: Optional[str] = None,
+    is_active: Optional[bool] = True
+) -> List[Producer]:
+    """
+    Get a list of producers with optional filtering.
+    """
+    # Reuse get_customers function with producer-specific filters
+    customers = await get_customers(skip, limit, search, None, producer_type, is_active)
+    # Convert to Producer model for API consistency
+    return [Producer.parse_obj(customer.dict()) for customer in customers]
+
+
 async def get_customer_by_id(customer_id: UUID) -> Optional[CustomerWithDetails]:
     """
     Get a specific customer by ID with details.
@@ -82,6 +114,7 @@ async def get_customer_by_id(customer_id: UUID) -> Optional[CustomerWithDetails]
     query = """
     SELECT 
         id, email, full_name, phone, address, postal_code, city, customer_type, 
+        business_name, business_id, producer_type, website, description, is_active,
         created_at, updated_at
     FROM 
         customers 
@@ -127,6 +160,20 @@ async def get_customer_by_id(customer_id: UUID) -> Optional[CustomerWithDetails]
     return customer
 
 
+async def get_producer_by_id(producer_id: UUID) -> Optional[ProducerWithDetails]:
+    """
+    Get a specific producer by ID with details.
+    """
+    # Reuse get_customer_by_id function but convert to ProducerWithDetails
+    customer = await get_customer_by_id(producer_id)
+    if not customer:
+        return None
+    
+    # Convert to ProducerWithDetails model for API consistency
+    producer = ProducerWithDetails.parse_obj(customer.dict())
+    return producer
+
+
 async def create_customer(customer: CustomerCreate) -> Customer:
     """
     Create a new customer.
@@ -138,16 +185,10 @@ async def create_customer(customer: CustomerCreate) -> Customer:
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    query = """
-    INSERT INTO customers 
-        (email, full_name, phone, address, postal_code, city, customer_type) 
-    VALUES 
-        ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING 
-        id, email, full_name, phone, address, postal_code, city, customer_type, 
-        created_at, updated_at
-    """
-    
+    # Prepare base fields
+    fields = [
+        "email", "full_name", "phone", "address", "postal_code", "city", "customer_type"
+    ]
     params = [
         customer.email, 
         customer.full_name,
@@ -157,6 +198,44 @@ async def create_customer(customer: CustomerCreate) -> Customer:
         customer.city,
         customer.customer_type
     ]
+    
+    # Add producer-specific fields if provided
+    if customer.business_name is not None:
+        fields.append("business_name")
+        params.append(customer.business_name)
+    
+    if customer.business_id is not None:
+        fields.append("business_id")
+        params.append(customer.business_id)
+    
+    if customer.producer_type is not None:
+        fields.append("producer_type")
+        params.append(customer.producer_type)
+    
+    if customer.website is not None:
+        fields.append("website")
+        params.append(str(customer.website))
+    
+    if customer.description is not None:
+        fields.append("description")
+        params.append(customer.description)
+    
+    if customer.is_active is not None:
+        fields.append("is_active")
+        params.append(customer.is_active)
+    
+    # Build the INSERT query
+    placeholders = [f"${i+1}" for i in range(len(params))]
+    query = f"""
+    INSERT INTO customers 
+        ({', '.join(fields)}) 
+    VALUES 
+        ({', '.join(placeholders)})
+    RETURNING 
+        id, email, full_name, phone, address, postal_code, city, customer_type,
+        business_name, business_id, producer_type, website, description, is_active,
+        created_at, updated_at
+    """
     
     customer_data = await fetch_one(query, params)
     return Customer.parse_obj(customer_data)
@@ -183,6 +262,20 @@ async def update_customer(customer_id: UUID, customer_update: CustomerUpdate) ->
     if customer_update.customer_type is not None:
         update_fields["customer_type"] = customer_update.customer_type
     
+    # Producer-specific fields
+    if customer_update.business_name is not None:
+        update_fields["business_name"] = customer_update.business_name
+    if customer_update.business_id is not None:
+        update_fields["business_id"] = customer_update.business_id
+    if customer_update.producer_type is not None:
+        update_fields["producer_type"] = customer_update.producer_type
+    if customer_update.website is not None:
+        update_fields["website"] = str(customer_update.website)
+    if customer_update.description is not None:
+        update_fields["description"] = customer_update.description
+    if customer_update.is_active is not None:
+        update_fields["is_active"] = customer_update.is_active
+    
     if not update_fields:
         # No fields to update, return current customer
         return await get_customer_by_id(customer_id)
@@ -192,7 +285,7 @@ async def update_customer(customer_id: UUID, customer_update: CustomerUpdate) ->
         "customers",
         update_fields,
         {"id": customer_id},
-        returning="id, email, full_name, phone, address, postal_code, city, customer_type, created_at, updated_at"
+        returning="id, email, full_name, phone, address, postal_code, city, customer_type, business_name, business_id, producer_type, website, description, is_active, created_at, updated_at"
     )
     
     customer_data = await fetch_one(query, params)

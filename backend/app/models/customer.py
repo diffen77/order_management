@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, validator, HttpUrl
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -11,6 +11,12 @@ class CustomerType(str, Enum):
     VIP = "VIP"
 
 
+class ProducerType(str, Enum):
+    SMALL_FARM = "small_farm"
+    WHOLESALE_SUPPLIER = "wholesale_supplier"
+    ARTISAN_VENDOR = "artisan_vendor"
+
+
 class CustomerBase(BaseModel):
     email: EmailStr
     full_name: str
@@ -19,6 +25,13 @@ class CustomerBase(BaseModel):
     postal_code: Optional[str] = None
     city: Optional[str] = None
     customer_type: CustomerType = CustomerType.REGULAR
+    # Producer-specific fields
+    business_name: Optional[str] = None
+    business_id: Optional[str] = None
+    producer_type: Optional[ProducerType] = None
+    website: Optional[HttpUrl] = None
+    description: Optional[str] = None
+    is_active: bool = True
 
 
 class CustomerCreate(CustomerBase):
@@ -33,6 +46,13 @@ class CustomerUpdate(BaseModel):
     postal_code: Optional[str] = None
     city: Optional[str] = None
     customer_type: Optional[CustomerType] = None
+    # Producer-specific fields
+    business_name: Optional[str] = None
+    business_id: Optional[str] = None
+    producer_type: Optional[ProducerType] = None
+    website: Optional[HttpUrl] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class Customer(CustomerBase):
@@ -85,6 +105,11 @@ class CustomerPreferences(CustomerPreferencesBase):
 
     class Config:
         orm_mode = True
+
+
+# Producer alias classes for consistent API naming
+Producer = Customer
+ProducerWithDetails = CustomerWithDetails
 
 
 # Update forward references
