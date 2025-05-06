@@ -21,7 +21,7 @@ from app.services.shipping_service import (
     get_shipping_method_by_id, apply_shipping_to_order
 )
 from app.services.order_service import get_order_by_id
-from app.services.fulfillment_service import generate_producer_pick_list, generate_order_packing_slip, get_orders_by_producer
+from app.services.fulfillment_service import generate_producer_pick_list, generate_order_packing_slip, get_orders_by_producer, update_fulfillment_status, get_fulfillment_history
 
 
 router = APIRouter()
@@ -154,7 +154,7 @@ async def generate_order_packing_slip_endpoint(
 
 
 @router.patch("/orders/{order_id}/status", response_model=Dict)
-async def update_fulfillment_status(
+async def update_fulfillment_status_endpoint(
     order_id: UUID = Path(..., description="The ID of the order"),
     status_update: FulfillmentStatusUpdate = Body(...),
     current_user: Dict = Depends(require_permission("update:fulfillment"))
@@ -163,18 +163,25 @@ async def update_fulfillment_status(
     Update the fulfillment status of an order.
     Requires update:fulfillment permission.
     """
-    # This is a placeholder implementation for MVP
-    # In a complete implementation, we would:
-    # 1. Validate the status transition
-    # 2. Update the fulfillment status
-    # 3. Create a history record
-    # 4. Trigger any necessary notifications
-    
-    # For now, we'll raise a not implemented error
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Fulfillment status update is not yet implemented"
+    user_id = UUID(current_user["id"])
+    return await update_fulfillment_status(
+        order_id=order_id,
+        new_status=status_update.status,
+        user_id=user_id,
+        notes=status_update.notes
     )
+
+
+@router.get("/orders/{order_id}/history", response_model=List[Dict])
+async def get_order_fulfillment_history(
+    order_id: UUID = Path(..., description="The ID of the order"),
+    current_user: Dict = Depends(require_permission("read:fulfillment"))
+):
+    """
+    Get the fulfillment status history for an order.
+    Requires read:fulfillment permission.
+    """
+    return await get_fulfillment_history(order_id)
 
 
 @router.get("/orders/by-producer", response_model=Dict[str, Any])

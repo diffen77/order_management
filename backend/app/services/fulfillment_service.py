@@ -557,4 +557,167 @@ async def get_orders_by_producer(
         return {
             "producers": formatted_producers,
             "total_producers": len(formatted_producers)
-        } 
+        }
+
+
+async def update_fulfillment_status(
+    order_id: UUID,
+    new_status: str,
+    user_id: UUID,
+    notes: Optional[str] = None
+) -> Dict:
+    """
+    Update the fulfillment status of an order with validation and history tracking.
+    
+    Args:
+        order_id: UUID of the order
+        new_status: New fulfillment status
+        user_id: UUID of the user performing the update
+        notes: Optional notes for the status change
+        
+    Returns:
+        Dict: Updated order data
+    """
+    supabase = get_supabase_client()
+    
+    # 1. Get the current order
+    order_response = supabase.table("orders").select("*").eq("id", str(order_id)).execute()
+    
+    if order_response.error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching order: {order_response.error.message}"
+        )
+    
+    if not order_response.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order with ID '{order_id}' not found"
+        )
+    
+    order = order_response.data[0]
+    
+    # 2. Validate the status value
+    current_status = order.get("fulfillment_status", FulfillmentStatus.PENDING)
+    
+    try:
+        # Ensure it's a valid status value
+        if new_status not in [
+            FulfillmentStatus.PENDING,
+            FulfillmentStatus.PROCESSING,
+            FulfillmentStatus.PICKED,
+            FulfillmentStatus.PACKED,
+            FulfillmentStatus.READY,
+            FulfillmentStatus.SHIPPED,
+            FulfillmentStatus.COMPLETED,
+            FulfillmentStatus.CANCELLED
+        ]:
+            raise ValueError(f"Invalid fulfillment status: {new_status}")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    
+    # 3. Define and validate status transitions
+    valid_transitions = {
+        FulfillmentStatus.PENDING: [FulfillmentStatus.PROCESSING, FulfillmentStatus.CANCELLED],
+        FulfillmentStatus.PROCESSING: [FulfillmentStatus.PICKED, FulfillmentStatus.CANCELLED],
+        FulfillmentStatus.PICKED: [FulfillmentStatus.PACKED, FulfillmentStatus.CANCELLED],
+        FulfillmentStatus.PACKED: [FulfillmentStatus.READY, FulfillmentStatus.CANCELLED],
+        FulfillmentStatus.READY: [FulfillmentStatus.SHIPPED, FulfillmentStatus.CANCELLED],
+        FulfillmentStatus.SHIPPED: [FulfillmentStatus.COMPLETED, FulfillmentStatus.CANCELLED],
+        FulfillmentStatus.COMPLETED: [],  # Terminal state
+        FulfillmentStatus.CANCELLED: []   # Terminal state
+    }
+    
+    if new_status not in valid_transitions.get(current_status, []):
+        valid_status_list = ", ".join(valid_transitions.get(current_status, []))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot transition from '{current_status}' to '{new_status}'. Valid transitions: {valid_status_list}"
+        )
+    
+    # 4. Create history record
+    fulfillment_history = {
+        "id": str(uuid4()),
+        "order_id": str(order_id),
+        "previous_status": current_status,
+        "new_status": new_status,
+        "changed_by": str(user_id),
+        "notes": notes,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # Insert history record
+    history_response = supabase.table("fulfillment_history").insert(fulfillment_history).execute()
+    
+    if history_response.error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error recording status history: {history_response.error.message}"
+        )
+    
+    # 5. Update order fulfillment status
+    update_data = {
+        "fulfillment_status": new_status,
+        "updated_at": datetime.now().isoformat()
+    }
+    
+    # If status is SHIPPED, update order status to SHIPPED as well
+    if new_status == FulfillmentStatus.SHIPPED:
+        update_data["status"] = "shipped"
+    
+    # If status is COMPLETED, update order status to DELIVERED
+    if new_status == FulfillmentStatus.COMPLETED:
+        update_data["status"] = "delivered"
+    
+    update_response = supabase.table("orders").update(update_data).eq("id", str(order_id)).execute()
+    
+    if update_response.error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating order: {update_response.error.message}"
+        )
+    
+    # 6. Get the updated order
+    updated_order = update_response.data[0] if update_response.data else None
+    
+    # 7. Return the updated order with appropriate message
+    result = {
+        "order_id": order_id,
+        "fulfillment_status": new_status,
+        "previous_status": current_status,
+        "order_status": updated_order.get("status") if updated_order else None,
+        "message": f"Fulfillment status updated from '{current_status}' to '{new_status}'",
+        "updated_at": datetime.now().isoformat()
+    }
+    
+    return result
+
+
+async def get_fulfillment_history(order_id: UUID) -> List[Dict]:
+    """
+    Get the history of fulfillment status changes for an order.
+    
+    Args:
+        order_id: UUID of the order
+        
+    Returns:
+        List[Dict]: History records for fulfillment status changes
+    """
+    supabase = get_supabase_client()
+    
+    history_response = supabase.table("fulfillment_history")\
+        .select("*")\
+        .eq("order_id", str(order_id))\
+        .order("created_at", desc=False)\
+        .execute()
+    
+    if history_response.error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching fulfillment history: {history_response.error.message}"
+        )
+    
+    return history_response.data 
