@@ -304,4 +304,257 @@ async def generate_order_packing_slip(order_id: UUID) -> PackingSlip:
         pickup_instructions=pickup_instructions
     )
     
-    return packing_slip 
+    return packing_slip
+
+
+async def get_orders_by_producer(
+    producer_id: Optional[UUID] = None, 
+    status: Optional[str] = None,
+    fulfillment_status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100
+) -> Dict[str, Any]:
+    """
+    Group orders by producer or get orders for a specific producer.
+    This function allows for retrieving orders that contain products from specific producers,
+    which is essential for the order fulfillment process.
+    
+    Args:
+        producer_id: Optional UUID of a specific producer to filter by
+        status: Optional order status to filter by (e.g., 'confirmed', 'processing')
+        fulfillment_status: Optional fulfillment status to filter by (e.g., 'pending', 'processing')
+        skip: Number of results to skip (for pagination)
+        limit: Maximum number of results to return (for pagination)
+        
+    Returns:
+        Dict containing producer information and their associated orders
+    """
+    supabase = get_supabase_client()
+    
+    # Step 1: Get all relevant products
+    products_query = supabase.table("products").select("id,name,producer_id")
+    
+    if producer_id:
+        products_query = products_query.eq("producer_id", str(producer_id))
+    
+    products_response = products_query.execute()
+    
+    if products_response.error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching products: {products_response.error.message}"
+        )
+    
+    if not products_response.data:
+        if producer_id:
+            return {
+                "producer_id": producer_id,
+                "orders": [],
+                "total_orders": 0,
+                "message": "No products found for this producer"
+            }
+        else:
+            return {
+                "producers": [],
+                "total_producers": 0,
+                "message": "No products found"
+            }
+    
+    # Group products by producer_id
+    products_by_producer = {}
+    product_ids = []
+    
+    for product in products_response.data:
+        prod_id = product["id"]
+        producer_id = product["producer_id"]
+        
+        product_ids.append(prod_id)
+        
+        if producer_id not in products_by_producer:
+            products_by_producer[producer_id] = []
+            
+        products_by_producer[producer_id].append(product)
+    
+    # Step 2: Find order items containing these products
+    if not product_ids:
+        if producer_id:
+            return {
+                "producer_id": producer_id,
+                "orders": [],
+                "total_orders": 0,
+                "message": "No products found for this producer"
+            }
+        else:
+            return {
+                "producers": [],
+                "total_producers": 0,
+                "message": "No products found"
+            }
+    
+    order_items_query = supabase.table("order_items").select("*").in_("product_id", product_ids).execute()
+    
+    if order_items_query.error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching order items: {order_items_query.error.message}"
+        )
+    
+    if not order_items_query.data:
+        if producer_id:
+            return {
+                "producer_id": producer_id,
+                "orders": [],
+                "total_orders": 0,
+                "message": "No orders found for this producer's products"
+            }
+        else:
+            return {
+                "producers": [],
+                "total_producers": 0,
+                "message": "No orders found for any producers"
+            }
+    
+    # Get order IDs from order items
+    order_ids = list(set(str(item["order_id"]) for item in order_items_query.data))
+    
+    # Step 3: Get the orders with those IDs
+    orders_query = supabase.table("orders").select("*").in_("id", order_ids)
+    
+    # Apply status filter if provided
+    if status:
+        orders_query = orders_query.eq("status", status)
+    
+    # Apply fulfillment status filter if provided
+    if fulfillment_status:
+        orders_query = orders_query.eq("fulfillment_status", fulfillment_status)
+    
+    # Apply pagination
+    orders_query = orders_query.order("created_at", desc=True).range(skip, skip + limit - 1)
+    
+    orders_response = orders_query.execute()
+    
+    if orders_response.error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching orders: {orders_response.error.message}"
+        )
+    
+    if not orders_response.data:
+        if producer_id:
+            return {
+                "producer_id": producer_id,
+                "orders": [],
+                "total_orders": 0,
+                "message": "No orders found matching the specified criteria"
+            }
+        else:
+            return {
+                "producers": [],
+                "total_producers": 0,
+                "message": "No orders found matching the specified criteria"
+            }
+    
+    # Step 4: Group orders by producer
+    # We need to determine which producers have items in which orders
+    orders_by_producer = {}
+    
+    # First, create a mapping from order_id to order object
+    order_map = {order["id"]: order for order in orders_response.data}
+    
+    # Group order items by order_id
+    order_items_by_order = {}
+    for item in order_items_query.data:
+        order_id = item["order_id"]
+        if order_id not in order_items_by_order:
+            order_items_by_order[order_id] = []
+        order_items_by_order[order_id].append(item)
+    
+    # For each product in an order, add that order to the appropriate producer
+    for order_id, items in order_items_by_order.items():
+        # Skip if order not in filtered results
+        if order_id not in order_map:
+            continue
+            
+        order = order_map[order_id]
+        
+        # Find which producers have items in this order
+        producers_in_order = set()
+        for item in items:
+            product_id = item["product_id"]
+            # Find the producer of this product
+            for p_id, products in products_by_producer.items():
+                if any(p["id"] == product_id for p in products):
+                    producers_in_order.add(p_id)
+        
+        # Add this order to each producer's list
+        for p_id in producers_in_order:
+            if p_id not in orders_by_producer:
+                orders_by_producer[p_id] = []
+            
+            # Check if we've already added this order to this producer
+            if not any(o["id"] == order_id for o in orders_by_producer[p_id]):
+                # Add order with its items
+                order_with_items = order.copy()
+                order_with_items["items"] = [
+                    item for item in items 
+                    if any(p["id"] == item["product_id"] for p in products_by_producer[p_id])
+                ]
+                orders_by_producer[p_id].append(order_with_items)
+    
+    # Step 5: Get producer names and details
+    producer_ids = list(orders_by_producer.keys())
+    
+    if not producer_ids:
+        if producer_id:
+            return {
+                "producer_id": producer_id,
+                "orders": [],
+                "total_orders": 0,
+                "message": "No orders found for this producer with the specified criteria"
+            }
+        else:
+            return {
+                "producers": [],
+                "total_producers": 0,
+                "message": "No orders found for any producers with the specified criteria"
+            }
+    
+    producers_response = supabase.table("users").select("id,full_name,company_name").in_("id", producer_ids).execute()
+    
+    producer_details = {}
+    if not producers_response.error and producers_response.data:
+        for producer in producers_response.data:
+            p_id = producer["id"]
+            # Use company name if available, otherwise use full name
+            producer_name = producer.get("company_name") or producer.get("full_name") or "Unknown Producer"
+            producer_details[p_id] = {
+                "id": p_id,
+                "name": producer_name
+            }
+    
+    # Step 6: Format the response based on whether we're requesting a specific producer or all
+    if producer_id:
+        # Single producer response
+        producer_orders = orders_by_producer.get(str(producer_id), [])
+        return {
+            "producer_id": producer_id,
+            "producer_name": producer_details.get(str(producer_id), {}).get("name", "Unknown Producer"),
+            "orders": producer_orders,
+            "total_orders": len(producer_orders)
+        }
+    else:
+        # All producers response
+        formatted_producers = []
+        for p_id, orders in orders_by_producer.items():
+            producer_info = producer_details.get(p_id, {"id": p_id, "name": "Unknown Producer"})
+            formatted_producers.append({
+                "id": p_id,
+                "name": producer_info["name"],
+                "orders": orders,
+                "total_orders": len(orders)
+            })
+        
+        return {
+            "producers": formatted_producers,
+            "total_producers": len(formatted_producers)
+        } 

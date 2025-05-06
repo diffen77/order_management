@@ -21,6 +21,7 @@ from app.services.shipping_service import (
     get_shipping_method_by_id, apply_shipping_to_order
 )
 from app.services.order_service import get_order_by_id
+from app.services.fulfillment_service import generate_producer_pick_list, generate_order_packing_slip, get_orders_by_producer
 
 
 router = APIRouter()
@@ -122,7 +123,7 @@ async def get_fulfillment_details(
 
 
 @router.get("/picklist/producer/{producer_id}", response_model=PickList)
-async def generate_producer_pick_list(
+async def generate_producer_pick_list_endpoint(
     producer_id: UUID = Path(..., description="The ID of the producer"),
     current_user: Dict = Depends(require_permission("read:fulfillment"))
 ):
@@ -131,25 +132,14 @@ async def generate_producer_pick_list(
     This would include all pending orders with items from this producer.
     Requires read:fulfillment permission.
     
-    For MVP, this is a simplified implementation. 
-    Future versions will include more advanced sorting and optimization.
+    The pick list is optimized for efficient picking by grouping items by product
+    and sorting by warehouse location.
     """
-    # This is a placeholder implementation for MVP
-    # In a complete implementation, we would:
-    # 1. Query for all pending orders with items from this producer
-    # 2. Group items by product
-    # 3. Sort by location or other optimization criteria
-    # 4. Generate a formal pick list document
-    
-    # For now, we'll raise a not implemented error
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Pick list generation is not yet implemented"
-    )
+    return await generate_producer_pick_list(producer_id)
 
 
 @router.get("/packingslip/order/{order_id}", response_model=PackingSlip)
-async def generate_order_packing_slip(
+async def generate_order_packing_slip_endpoint(
     order_id: UUID = Path(..., description="The ID of the order"),
     current_user: Dict = Depends(require_permission("read:fulfillment"))
 ):
@@ -160,18 +150,7 @@ async def generate_order_packing_slip(
     For MVP, this is a simplified implementation.
     Future versions will include branded templates and more customization.
     """
-    # This is a placeholder implementation for MVP
-    # In a complete implementation, we would:
-    # 1. Get complete order details
-    # 2. Format items for the packing slip
-    # 3. Include customer and shipping information
-    # 4. Generate a formal packing slip document
-    
-    # For now, we'll raise a not implemented error
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Packing slip generation is not yet implemented"
-    )
+    return await generate_order_packing_slip(order_id)
 
 
 @router.patch("/orders/{order_id}/status", response_model=Dict)
@@ -195,4 +174,50 @@ async def update_fulfillment_status(
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="Fulfillment status update is not yet implemented"
+    )
+
+
+@router.get("/orders/by-producer", response_model=Dict[str, Any])
+async def get_orders_grouped_by_producer(
+    status: Optional[str] = Query(None, description="Filter orders by status (e.g., 'confirmed', 'processing')"),
+    fulfillment_status: Optional[str] = Query(None, description="Filter orders by fulfillment status (e.g., 'pending', 'processing')"),
+    skip: int = Query(0, description="Number of results to skip for pagination"),
+    limit: int = Query(100, description="Maximum number of results to return for pagination"),
+    current_user: Dict = Depends(require_permission("read:fulfillment"))
+):
+    """
+    Get orders grouped by producer.
+    This endpoint allows for efficient fulfillment by showing which producers have items in which orders.
+    Requires read:fulfillment permission.
+    """
+    return await get_orders_by_producer(
+        producer_id=None,
+        status=status,
+        fulfillment_status=fulfillment_status,
+        skip=skip,
+        limit=limit
+    )
+
+
+@router.get("/orders/by-producer/{producer_id}", response_model=Dict[str, Any])
+async def get_orders_for_producer(
+    producer_id: UUID = Path(..., description="The ID of the producer"),
+    status: Optional[str] = Query(None, description="Filter orders by status (e.g., 'confirmed', 'processing')"),
+    fulfillment_status: Optional[str] = Query(None, description="Filter orders by fulfillment status (e.g., 'pending', 'processing')"),
+    skip: int = Query(0, description="Number of results to skip for pagination"),
+    limit: int = Query(100, description="Maximum number of results to return for pagination"),
+    current_user: Dict = Depends(require_permission("read:fulfillment"))
+):
+    """
+    Get orders for a specific producer.
+    This endpoint returns all orders that contain products from the specified producer.
+    Useful for producer-specific fulfillment operations.
+    Requires read:fulfillment permission.
+    """
+    return await get_orders_by_producer(
+        producer_id=producer_id,
+        status=status,
+        fulfillment_status=fulfillment_status,
+        skip=skip,
+        limit=limit
     ) 
